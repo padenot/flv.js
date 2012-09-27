@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<title>
+  OGG Header parse test.
+</title>
+<style>
+#trace {
+  width: 50%;
+}
+#trace .ok {
+  color: green;
+}
+#trace .ko {
+  color: red;
+}
+table {
+  margin-top: 1em;
+  border-collapse: collapse;
+  border: 1px solid black;
+}
+td, tr {
+  border: 1px solid black;
+  padding: 0.2em;
+}
+#file_list {
+  display: none;
+}
+.timing {
+  border: 1px solid black;
+}
+table.error {
+  background: red;
+}
+
+table.ok {
+  background: green;
+}
+
+.packets {
+  font-family: courier;
+  position: absolute;
+  right:0%;
+  top:5%;
+  width: 40%;
+}
+</style>
+<meta charset="utf-8">
+</head>
+<body onload="init()">
+<ul id="trace">
+</ul>
+
+<ol class=packets>
+</ol>
+<script src="flv.js" type="text/javascript"></script>
+<script src="upload_files.js" type="text/javascript"></script>
+</body>
+</html>
