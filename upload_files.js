@@ -8,17 +8,11 @@ var Profile = {
   count : 0
 };
 
-// A path → blob hash.
-var tracks = {};
 // Prefix of all the files to be fetched.
 var prefix = "media/";
 
-var print_metadata = true;
-
 // This is to be replaced by a proper access method.
 var MediaFetcher = {
-  // A path → ogg file info hash.
-  media : {},
   // Fetch the media using an xhr, and start to parse the result.
   fetch_media : function(url) {
     var _this = this;
@@ -39,18 +33,16 @@ var MediaFetcher = {
 
     xhr.send();
   },
-  display_table : function(table, key, value) {
-    var tr = document.createElement('tr');
-    var td_label = document.createElement('td');
-    var td_value = document.createElement('td');
-    td_label.innerHTML = key;
-    td_value.innerHTML = value;
-    table.appendChild(tr);
-    tr.appendChild(td_label);
-    tr.appendChild(td_value);
-  },
   handle_file : function (blob, url, options) {
     var _this = this;
+    var start = Date.now();
+    var demuxed_bytes = 0,
+        demuxed_bytes_last = 0;
+    var speedCounter = setInterval(function() {
+      var str = "Speed: " + (Math.round((demuxed_bytes - demuxed_bytes_last) / 1024 * 2)) + " kB per s";
+      document.querySelector("#speed").innerHTML = str;
+      demuxed_bytes_last = demuxed_bytes;
+    }, 500);
     var flvfile = new FlvFile(blob, function(type, data) {
       var packets_list = document.querySelector(".packets"),
                          line = document.createElement("li");
@@ -58,35 +50,26 @@ var MediaFetcher = {
       switch (type) {
         case "audio":
         case "video":
-          line.innerHTML = "[" + type + "] " + "[pts:" + data.pts + "]" + "(size: " + data.data.byteLength + ")"
+          //line.innerHTML = "[" + type + "] " + "[pts:" + data.pts + "]" + "(size: " + data.data.byteLength + ")"
+          demuxed_bytes += data.data.byteLength;
           break;
         case "metadata":
           line.innerHTML = "<pre>" + JSON.stringify(data, null, "\t") + "</pre>";
           break;
         case "eof":
-          line.innerHTML = "EOF";
+          line.innerHTML = "EOF (time in ms: " + (Date.now() - start) + ")";
+          packets_list.appendChild(line);
+          clearInterval(speedCounter);
           break;
       }
 
-      packets_list.appendChild(line);
+      //packets_list.appendChild(line);
 
     }, function(str) {
       alert("Error:" + str);
     });
 
-    _this.media[url] = flvfile;
     flvfile.parse();
-  },
-
- /**
-  * Get all the files, supposed to be <li> tags in the page.
-*/
-  list_files : function() {
-    var f = Array.prototype.slice.call(document.querySelectorAll('li'));
-    var _this = this;
-    f.forEach(function(e) {
-      _this.fetch_media(e.innerHTML);
-    });
   },
   get_file_list : function() {
     var _this = this;

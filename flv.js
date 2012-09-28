@@ -6,7 +6,7 @@
 /**
  * Enable logging.
  */
-var debug = true;
+var debug = false;
 
 /**
  * Misc util functions.
@@ -657,7 +657,7 @@ FlvFile.prototype.parse_packet = function(err, data) {
   } else if (stream_type == this.FLV_STREAM_TYPE_VIDEO) {
     this.current_stream = this.streams.video[0];
     if ((flags & this.FLV_VIDEO_CODECID_MASK) != this.FLV_CODECID_H264) {
-      this.error_callback("The audio codec in this file"+
+      this.error_callback("The video codec in this file"+
                           "is not h264. Not supported.");
       return;
     } else {
@@ -726,6 +726,7 @@ FlvFile.prototype.read_and_send_packet = function(packet, packet_size, stream_ty
   Util.get(this.blob, "binary", this.offset, this.offset + packet_size, function(err, data) {
     if (err) { alert("Error ! "); return; }
     packet.data = data;
+    packet.type = _this.stream_type_to_str[stream_type];
     _this.data_callback(_this.stream_type_to_str[stream_type], packet);
     _this.offset += packet_size;
     Util.get(_this.blob, "binary", _this.offset, _this.offset + 32, _this.parse_packet.bind(_this));
