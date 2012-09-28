@@ -87,7 +87,7 @@ EBMLStream.prototype.put = function(array) {
 /**
  * hacked up webm/matroska muxer. Supports only two channels, no cues.
  */
-function WebM() {
+function MKV() {
   /**
    * Those should contain Uint8Array.
    */
@@ -104,7 +104,7 @@ function WebM() {
  * When we are done, we can get the blob to use it into a <video> using that
  * method.
  */
-WebM.prototype.get_blob() {
+MKV.prototype.get_blob() {
   var parts = [this.header, this.segment, this.cluster].push.apply(a, this.simpleblocks)
   // adjust the content-type to taste.
   return new Blob(parts, {type: "video/x-matroska"});
@@ -113,7 +113,7 @@ WebM.prototype.get_blob() {
 /**
  * Write the header.
  */
-WebM.prototype.write_header = function() {
+MKV.prototype.write_header = function() {
   this.header = new Uint8Array(22);
   stream = new EBMLStream(this.header);
 
@@ -125,7 +125,7 @@ WebM.prototype.write_header = function() {
 /**
  * Write the header for a segment.
  */
-WebM.prototype.write_segment = function() {
+MKV.prototype.write_segment = function() {
   this.segment = new Uint8Array(9);
   stream = new EBMLStream(this.segment);
   stream.put([0x18, 0x53, 0x80, 0x67]);
@@ -135,7 +135,7 @@ WebM.prototype.write_segment = function() {
 /**
  * Write the header for a cluster. We only have one cluster.
  */
-WebM.prototype.write_cluster = function() {
+MKV.prototype.write_cluster = function() {
   this.cluster = new Uint8Array(12);
   stream = new EBMLStream(this.cluster);
   stream.put([0x1f, 0x43, 0xb6, 0x75]);
@@ -147,7 +147,7 @@ WebM.prototype.write_cluster = function() {
 /**
  * Write a SimpleBlock.
  */
-WebM.prototype.write_simple_block = function(data) {
+MKV.prototype.write_simple_block = function(data) {
   // length of the packet + 21 bytes max for the little header
   var array = new Uint8Array(data.data.length + 21);
   stream = new EBMLStream(array);
@@ -173,7 +173,7 @@ WebM.prototype.write_simple_block = function(data) {
   this.simpleblocks.push(array);
 }
 
-WebM.prototype.dump = function() {
+MKV.prototype.dump = function() {
   console.log(arrayToString(this.header));
   console.log(arrayToString(this.segment));
   console.log(arrayToString(this.cluster));
@@ -183,7 +183,7 @@ WebM.prototype.dump = function() {
 }
 
 // for testing, in node.js for example.
-//meh = new WebM();
+//meh = new MKV();
 //meh.write_header();
 //meh.write_segment();
 //meh.write_cluster();
