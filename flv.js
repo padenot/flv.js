@@ -6,7 +6,7 @@
 /**
  * Enable logging.
  */
-var debug = false;
+var debug = true;
 
 /**
  * Misc util functions.
@@ -148,7 +148,7 @@ function BinaryStream(array) {
 
 BinaryStream.prototype.getUint32 = function() {
   this.assertDataAvailable(4);
-  var int = DataView(this.buffer).getUint32(this.index);
+  var int = new DataView(this.buffer).getUint32(this.index);
   this.index += 4;
   return int;
 };
@@ -180,14 +180,14 @@ BinaryStream.prototype.getUint16BE = function() {
 
 BinaryStream.prototype.getUint16 = function() {
   this.assertDataAvailable(2);
-  var int = DataView(this.buffer).getUint16(this.index);
+  var int = new DataView(this.buffer).getUint16(this.index);
   this.index += 2;
   return int;
 }
 
 BinaryStream.prototype.getInt32 = function() {
   this.assertDataAvailable(4);
-  var int = DataView(this.buffer).getInt32(this.index);
+  var int = new DataView(this.buffer).getInt32(this.index);
   this.index += 4;
   return int;
 };
@@ -200,27 +200,27 @@ BinaryStream.prototype.getUint8 = function() {
 
 BinaryStream.prototype.peekUint8 = function() {
   this.assertDataAvailable(1);
-  var int = DataView(this.buffer).getUint8(this.index);
+  var int = new DataView(this.buffer).getUint8(this.index);
   return int;
 };
 
 BinaryStream.prototype.getInt8 = function() {
   this.assertDataAvailable(1);
-  var int = DataView(this.buffer).getInt8(this.index++);
+  var int = new DataView(this.buffer).getInt8(this.index++);
   this.index++;
   return int;
 };
 
 BinaryStream.prototype.getUint8Array = function(len) {
   this.assertDataAvailable(len);
-  var int8array = Uint8Array(this.buffer, this.index, len);
+  var int8array = new Uint8Array(this.buffer, this.index, len);
   this.index += len;
   return int8array;
 };
 
 BinaryStream.prototype.getDouble = function() {
   this.assertDataAvailable(8);
-  var double = DataView(this.buffer).getFloat64(this.index);
+  var double = new DataView(this.buffer).getFloat64(this.index);
   this.index += 8;
   return double;
 };
@@ -250,7 +250,10 @@ BinaryStream.prototype.parsedBytes = function() {
 };
 
 BinaryStream.prototype.available = function() {
-  return this.buffer.byteLength - this.index;
+  var len = this.buffer.length != undefined ? this.buffer.length - this.index :
+                                              this.buffer.byteLength - this.index;
+  console.log("available in stream: " + len);
+  return len;
 }
 
 
@@ -398,12 +401,15 @@ FlvFile.prototype.parse = function() {
 // Helper to get and AMF string (16 bits length followed by an array of ascii char)
 FlvFile.prototype.get_amf_string = function(stream) {
   var len = stream.getUint16();
-  console.len("len: " + len);
-  return stream.getCharArray(len);
+  console.log("len: " + len);
+  var str = stream.getCharArray(len);
+  console.log("found string " + str);
+  return str;
 }
 
 // Parses the minimal subset of AMF needed to get the info about this video.
 FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
+  console.log("parse amf object.");
   var amf_type = stream.getUint8(),
                  num_val,
                  str_val;
@@ -426,8 +432,10 @@ FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
     case this.AMF_DATA_TYPE_UNSUPPORTED:
     break;
     case this.AMF_DATA_TYPE_MIXEDARRAY:
+      console.log("found mixed array");
       // skip 32bit max array len
       stream.skip(4);
+      console.log(stream.available());
       while (stream.available() > 2) {
         key = this.get_amf_string(stream);
         this.parse_amf_object(stream, depth + 1, key);
@@ -489,6 +497,7 @@ FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
 FlvFile.prototype.read_metabody = function(err, data) {
   if (err) { alert("Error ! "); return; }
   Util.add_trace("read_metabody.");
+  console.log("buffer size:" + data.length);
   var stream = new BinaryStream(data);
 
   var type = stream.getUint8();
@@ -503,7 +512,9 @@ FlvFile.prototype.read_metabody = function(err, data) {
   Util.assert(type == this.AMF_DATA_TYPE_STRING && str == "onMetaData",
               "Found correct things at the beginning of a metadata packet.");
 
+  console.log (stream.parsedBytes());
   this.parse_amf_object(stream, 0);
+  console.log (stream.parsedBytes());
   this.offset += stream.parsedBytes();
   Util.assert(this.offset == this.next, "We should have parsed all the data: " + this.offset + " == " + this.next);
 
@@ -530,6 +541,7 @@ FlvFile.prototype.parse_packet = function(err, data) {
   this.offset+=4;
 
   // If we have no data here, we reached EOF.
+  console.log("cheking for eof: " + stream.available());
   if (stream.available() == 0) {
     this.data_callback("eof", undefined);
     return;
@@ -544,6 +556,10 @@ FlvFile.prototype.parse_packet = function(err, data) {
   var packet_size = stream.getUint24();
   this.offset+=3;
   Util.add_trace("packet size: " + packet_size);
+  if (packet_size == 0) {
+    // also eof
+    return;
+  }
 
   // 32 bits, decoding timestamp
   var dts = stream.getUint24() |
@@ -624,7 +640,6 @@ FlvFile.prototype.parse_packet = function(err, data) {
   // Find the codec for this packet.
   if (stream_type == this.FLV_STREAM_TYPE_AUDIO) {
     this.current_stream = this.streams.audio[0];
-
     var channels = ((flags & this.FLV_AUDIO_CHANNEL_MASK) == this.FLV_STEREO)
                    ? 2 : 1;
     Util.add_trace("Found " + channels + " channels");
@@ -782,4 +797,59 @@ FlvFile.prototype.parse_header = function(next) {
     Util.get(_this.blob, "binary", _this.offset, _this.offset + 32, next.bind(_this));
   });
 };
+
+
+/**
+ * This file can be run in node.js on the command line.
+ *
+ * node flv.js path/to/file.flv
+ *
+ * It dumps the packet
+ */
+if (typeof window != 'object') {
+  var fs = require('fs')
+
+  fs.stat(process.argv[2], function (err, stats) {
+    console.log(JSON.stringify(stats.size));
+    var size = stats.size;
+    // monkey patch the get method
+    Util.get = function(blob, type, begin, end, callback) {
+      if (end > size) {
+        end = size;
+      }
+      var b = new Buffer(end - begin);
+      var fd = fs.open(process.argv[2], 'r', function (status, fd) {
+        if (status) {
+          console.log(status.message);
+          return;
+        }
+        fs.read(fd, b, 0, end - begin, begin, function(err, bytes, buffer) {
+          console.log("asked for " + (end - begin) + " available: " + buffer.length);
+          callback(err, buffer);
+        });
+      });
+    };
+
+
+
+  var flv = new FlvFile(undefined, function() {
+    console.log("data");
+  }, function() {
+    console.log("error");
+  });
+
+  flv.parse();
+
+  });
+  Util.add_trace = function(message, status) {
+    console.log (message);
+  };
+
+  Util.assert = function(expr, message) {
+    if (!expr) {
+      console.error(message);
+      process.abort();
+    }
+  };
+}
 
