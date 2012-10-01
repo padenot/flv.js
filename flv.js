@@ -262,7 +262,7 @@ BinaryStream.prototype.available = function() {
  * flv demuxer of ffmpeg, adapted for js, and stripped out of a lot of things.
  *
  * - blob is obviously the blob that contains the data you want to parse (i.e. the
- *   flv file.)
+ *   flv file).
  * - data_callback is a function that is called when a new packet has been
  *   extracted. This function expects two arguments: the string "audio",
  *   "video", "metadata" or "eof" for the type of the packet. If the packet type
@@ -272,6 +272,7 @@ BinaryStream.prototype.available = function() {
  *   {
  *     pts: time stamp in ms, // the time at which this
  *                            // packet should be  presented
+ *     type: the string "audio" or "video",
  *     data: ArrayBuffer      // the actual data of the packet
  *   }
  *
@@ -580,6 +581,7 @@ FlvFile.prototype.parse_packet = function(err, data) {
 
   // Next packet offset.
   this.next = packet_size + this.offset;
+  console.log("next packet at:" + this.next);
 
   var stream_type,
       flags,
@@ -660,15 +662,17 @@ FlvFile.prototype.parse_packet = function(err, data) {
       Util.add_trace("Found an aac packet.");
     }
   } else if (stream_type == this.FLV_STREAM_TYPE_VIDEO) {
-    this.current_stream = this.streams.video[0];
-    if ((flags & this.FLV_VIDEO_CODECID_MASK) != this.FLV_CODECID_H264) {
-      this.error_callback("The video codec in this file"+
-                          "is not h264. Not supported.");
-      return;
-    } else {
-      this.streams.video[0].codec = "h264";
-      Util.add_trace("Found an h264 packet.");
+    if (!this.streams.video[0].codec) {
+      if ((flags & this.FLV_VIDEO_CODECID_MASK) != this.FLV_CODECID_H264) {
+        this.error_callback("The video codec in this file"+
+                            "is not h264. Not supported.");
+        return;
+      } else {
+        this.streams.video[0].codec = "h264";
+        Util.add_trace("Found an h264 packet.");
+      }
     }
+    this.current_stream = this.streams.video[0];
   }
 
   // assuming we have h264 || aac
@@ -697,6 +701,7 @@ FlvFile.prototype.parse_packet = function(err, data) {
     this.read_flv_extradata(packet_size);
     return;
   }
+
 
   // Actually get the data packet. If we have a presentation time stamp, use it.
   // Otherwise, use the decoding time stamp.
@@ -776,7 +781,7 @@ FlvFile.prototype.parse_header = function(next) {
     }
     if (_this.hasVideo) {
       Util.add_trace("We have video.");
-      _this.streams.video.push("video track.");
+      _this.streams.video.push({});
     }
 
     // Header size, 4 bytes
@@ -807,7 +812,7 @@ if (typeof window != 'object') {
         end = size;
       }
       var b = new Buffer(end - begin);
-      var fd = fs.open(process.argv[2], 'r', function (status, fd) {
+      fs.open(process.argv[2], 'r', function (status, fd) {
         if (status) {
           console.log("Error when opening the file " + status.message);
           return;
@@ -818,26 +823,75 @@ if (typeof window != 'object') {
       });
     };
 
+    /**
+     * Folder in which we dump.
+     */
+    DUMP_OUT = "flvjs-packet-dump";
 
-
-  var flv = new FlvFile(undefined, function() {
-    console.log("data");
-  }, function() {
-    console.log("error");
-  });
-
-  flv.parse();
-
-  });
-  Util.add_trace = function(message, status) {
-    console.log (message);
-  };
-
-  Util.assert = function(expr, message) {
-    if (!expr) {
-      console.error(message);
-      process.abort();
+    function pad_left(str, char, final_width) {
+      Util.assert(str.length < final_width, "str is already longer than final width.");
+      var s = "";
+      var padding = final_width - str.length;
+      for (var i = 0; i < padding; i++) {
+        s += char;
+      }
+      return s + str;
     }
-  };
-}
 
+    function get_filename(seqnum) {
+      return pad_left(String(seqnum), "0", 6);
+    }
+
+    function start_parse() {
+      /**
+       * Start the parsing of the file. Whenever we get a data packet, we dump
+       * it in a file, with its sequence number as file name.
+       */
+      var flv = new FlvFile(undefined, function(type, data) {
+        if (type == "metadata") {
+          var prettified = JSON.stringify(data, null, "\t");
+          fs.writeFile(DUMP_OUT + "/metadata", prettified);
+        } else if (type == "audio" || type == "video") {
+          fs.open(DUMP_OUT + "/" + get_filename(seqnum), 'w', function(status, fd) {
+            fs.write(fd, data.data, 0, data.data.length, 0, function(err, written, buffer) {
+              fs.close(fd, function(err) {
+                console.log("file " + seqnum + " closed");
+              })
+            });
+          });
+          seqnum++;
+        } else if (type == "eof") {
+          console.log("received EOF callback.");
+        } else {
+          Util.assert(false, "Should not happen.");
+        }
+      }, function() {
+        console.log("error");
+      });
+
+      flv.parse();
+    }
+
+    // sequence number for the packets.
+    var seqnum = 0;
+    // create a directory if it does not exist
+    fs.stat(DUMP_OUT, function(err, stats) {
+      if (err) {
+        console.log(err);
+        fs.mkdir(DUMP_OUT, 0777, start_parse());
+      } else {
+        start_parse();
+      }
+    });
+    Util.add_trace = function(message, status) {
+      console.log (message);
+    };
+
+    Util.assert = function(expr, message) {
+      if (!expr) {
+        console.error(message);
+        process.abort();
+      }
+    };
+  });
+}
