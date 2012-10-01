@@ -581,7 +581,6 @@ FlvFile.prototype.parse_packet = function(err, data) {
 
   // Next packet offset.
   this.next = packet_size + this.offset;
-  console.log("next packet at:" + this.next);
 
   var stream_type,
       flags,
@@ -817,6 +816,7 @@ if (typeof window != 'object') {
           console.log("Error when opening the file " + status.message);
           return;
         }
+        if (end - begin == 0) {return;}
         fs.read(fd, b, 0, end - begin, begin, function(err, bytes, buffer) {
           callback(err, buffer);
         });
