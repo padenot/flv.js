@@ -1,0 +1,83 @@
+From 963520802f8c64ebc2e6ec2a937a1f320617dc24 Mon Sep 17 00:00:00 2001
+From: Paul ADENOT <paul@paul.cx>
+Date: Mon, 1 Oct 2012 16:13:30 +0200
+Subject: [PATCH 1/2] Change the format fo the pktdumper.c tools to match
+ flv.js output
+
+---
+ tools/pktdumper.c |   12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/tools/pktdumper.c b/tools/pktdumper.c
+index 2a80b25..34a6ea0 100644
+--- a/tools/pktdumper.c
++++ b/tools/pktdumper.c
+@@ -108,12 +108,8 @@ int main(int argc, char **argv)
+ 
+     while ((err = av_read_frame(fctx, &pkt)) >= 0) {
+         int fd;
+-        snprintf(pktfilename, sizeof(pktfilename), fntemplate, pktnum,
+-                 pkt.stream_index, pkt.pts, pkt.size,
+-                 (pkt.flags & AV_PKT_FLAG_KEY) ? 'K' : '_');
+-        printf(PKTFILESUFF "\n", pktnum, pkt.stream_index, pkt.pts, pkt.size,
+-               (pkt.flags & AV_PKT_FLAG_KEY) ? 'K' : '_');
+-        //printf("open(\"%s\")\n", pktfilename);
++        snprintf(pktfilename, sizeof(pktfilename), "%06ld", pktnum);
++        printf("open(\"%s\")\n", pktfilename);
+         if (!nowrite) {
+             fd  = open(pktfilename, O_WRONLY | O_CREAT, 0644);
+             err = write(fd, pkt.data, pkt.size);
+@@ -131,8 +127,8 @@ int main(int argc, char **argv)
+ 
+     avformat_close_input(&fctx);
+ 
+-    while (donotquit)
+-        av_usleep(60 * 1000000);
++    /*while (donotquit)*/
++        /*av_usleep(60 * 1000000);*/
+ 
+     return 0;
+ }
+-- 
+1.7.9.5
+
+
+From d69fd2db99ca93b6bd90c7d4c3d57f2c003851bc Mon Sep 17 00:00:00 2001
+From: Paul ADENOT <paul@paul.cx>
+Date: Mon, 1 Oct 2012 16:35:03 +0200
+Subject: [PATCH 2/2] put the output file in subdirs
+
+---
+ tools/pktdumper.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/tools/pktdumper.c b/tools/pktdumper.c
+index 34a6ea0..80aaa5f 100644
+--- a/tools/pktdumper.c
++++ b/tools/pktdumper.c
+@@ -38,6 +38,7 @@
+ #include "libavformat/avformat.h"
+ 
+ #define PKTFILESUFF "_%08" PRId64 "_%02d_%010" PRId64 "_%06d_%c.bin"
++#define DIRECTORY "ffmpeg-packet-dump"
+ 
+ static int usage(int ret)
+ {
+@@ -106,9 +107,13 @@ int main(int argc, char **argv)
+ 
+     av_init_packet(&pkt);
+ 
++    if (mkdir(DIRECTORY, 0777) && errno != EEXIST) {
++      perror("mkdir");
++    }
++
+     while ((err = av_read_frame(fctx, &pkt)) >= 0) {
+         int fd;
+-        snprintf(pktfilename, sizeof(pktfilename), "%06ld", pktnum);
++        snprintf(pktfilename, sizeof(pktfilename), "%s/%06ld", DIRECTORY, pktnum);
+         printf("open(\"%s\")\n", pktfilename);
+         if (!nowrite) {
+             fd  = open(pktfilename, O_WRONLY | O_CREAT, 0644);
+-- 
+1.7.9.5
+
