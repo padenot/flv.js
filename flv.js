@@ -252,7 +252,6 @@ BinaryStream.prototype.parsedBytes = function() {
 BinaryStream.prototype.available = function() {
   var len = this.buffer.length != undefined ? this.buffer.length - this.index :
                                               this.buffer.byteLength - this.index;
-  console.log("available in stream: " + len);
   return len;
 }
 
@@ -401,15 +400,12 @@ FlvFile.prototype.parse = function() {
 // Helper to get and AMF string (16 bits length followed by an array of ascii char)
 FlvFile.prototype.get_amf_string = function(stream) {
   var len = stream.getUint16();
-  console.log("len: " + len);
   var str = stream.getCharArray(len);
-  console.log("found string " + str);
   return str;
 }
 
 // Parses the minimal subset of AMF needed to get the info about this video.
 FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
-  console.log("parse amf object.");
   var amf_type = stream.getUint8(),
                  num_val,
                  str_val;
@@ -432,10 +428,8 @@ FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
     case this.AMF_DATA_TYPE_UNSUPPORTED:
     break;
     case this.AMF_DATA_TYPE_MIXEDARRAY:
-      console.log("found mixed array");
       // skip 32bit max array len
       stream.skip(4);
-      console.log(stream.available());
       while (stream.available() > 2) {
         key = this.get_amf_string(stream);
         this.parse_amf_object(stream, depth + 1, key);
@@ -497,7 +491,6 @@ FlvFile.prototype.parse_amf_object = function(stream, depth, key) {
 FlvFile.prototype.read_metabody = function(err, data) {
   if (err) { alert("Error ! "); return; }
   Util.add_trace("read_metabody.");
-  console.log("buffer size:" + data.length);
   var stream = new BinaryStream(data);
 
   var type = stream.getUint8();
@@ -512,9 +505,7 @@ FlvFile.prototype.read_metabody = function(err, data) {
   Util.assert(type == this.AMF_DATA_TYPE_STRING && str == "onMetaData",
               "Found correct things at the beginning of a metadata packet.");
 
-  console.log (stream.parsedBytes());
   this.parse_amf_object(stream, 0);
-  console.log (stream.parsedBytes());
   this.offset += stream.parsedBytes();
   Util.assert(this.offset == this.next, "We should have parsed all the data: " + this.offset + " == " + this.next);
 
@@ -541,7 +532,6 @@ FlvFile.prototype.parse_packet = function(err, data) {
   this.offset+=4;
 
   // If we have no data here, we reached EOF.
-  console.log("cheking for eof: " + stream.available());
   if (stream.available() == 0) {
     this.data_callback("eof", undefined);
     return;
@@ -810,7 +800,6 @@ if (typeof window != 'object') {
   var fs = require('fs')
 
   fs.stat(process.argv[2], function (err, stats) {
-    console.log(JSON.stringify(stats.size));
     var size = stats.size;
     // monkey patch the get method
     Util.get = function(blob, type, begin, end, callback) {
@@ -820,11 +809,10 @@ if (typeof window != 'object') {
       var b = new Buffer(end - begin);
       var fd = fs.open(process.argv[2], 'r', function (status, fd) {
         if (status) {
-          console.log(status.message);
+          console.log("Error when opening the file " + status.message);
           return;
         }
         fs.read(fd, b, 0, end - begin, begin, function(err, bytes, buffer) {
-          console.log("asked for " + (end - begin) + " available: " + buffer.length);
           callback(err, buffer);
         });
       });
