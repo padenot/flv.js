@@ -798,14 +798,15 @@ FlvFile.prototype.parse_header = function(next) {
  *
  * node flv.js path/to/file.flv
  *
- * It dumps the packet
+ * It dumps the audio and video packets, each in its own file, with an
+ * increasing index.
  */
 if (typeof window != 'object') {
   var fs = require('fs')
 
   fs.stat(process.argv[2], function (err, stats) {
     var size = stats.size;
-    // monkey patch the get method
+    // monkey patch the get method, to operate on local files.
     Util.get = function(blob, type, begin, end, callback) {
       if (end > size) {
         end = size;
@@ -824,7 +825,8 @@ if (typeof window != 'object') {
     };
 
     /**
-     * Folder in which we dump.
+     * Folder in which we dump. There will be a file by packet, so we can use
+     * `diff` directly on directories without hassle
      */
     DUMP_OUT = "flvjs-packet-dump";
 
